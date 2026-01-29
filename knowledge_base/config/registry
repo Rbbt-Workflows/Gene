@@ -1,0 +1,11 @@
+---
+CollecTRI:
+- "~/.rbbt/var/jobs/ExTRI2/CollecTRI2/Default.tsv"
+- source: "Transcription Factor=~Associated Gene Name"
+  target: "Target Gene=~Associated Gene Name"
+  description: Transcription Factor (TF) and their Target Genes (TG)
+Signor:
+- "~/.rbbt/share/databases/Signor/protein_protein"
+- source: "=>Associated Gene Name"
+  target: "=>Associated Gene Name"
+  description: Protein protein interactions

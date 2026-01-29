@@ -1,0 +1,21 @@
+Gene=/$PWD filter="*.rb *.rake Rakefile *.rdoc *.R *.sh *.js *.haml *.sass *.txt *.conf" {
+ workflow.rb
+ bin=bin filter="*"{
+ }
+ lib=lib{
+  Gene=Gene{
+   knowledge_base.rb
+  }
+ }
+ test=test {
+  test_helper.rb
+ }
+ data=data filter="*"{
+ }
+ share=share{
+  haml=haml{
+   desc.haml
+   uniprot_summary.haml
+  }
+ }
+}
