@@ -33,7 +33,16 @@ module Gene
   desc "Translate gene identifiers"
   input :target_format, :string, "Format to which translate the gene identifier", "UniProt/SwissProt Accession"
   entity_task translate: :string do |target_format|
-    entity.to target_format
+    begin
+      entity.to target_format
+    rescue => e
+      begin
+        entity.format = nil
+        entity.to target_format
+      rescue
+        raise e
+      end
+    end
   end
 
   entity_task_alias :uniprot, Gene, :translate, target_format: "UniProt/SwissProt Accession"
@@ -46,15 +55,37 @@ module Gene
   end
 
   entity_task entrez_pmids: :array do
+    entrez = begin
+               entity.entrez
+             rescue => e
+               begin
+                 entity.format = nil
+                 entity.entrez
+               rescue
+                 raise e
+               end
+             end
+    raise "Could not find entrez code for #{entity}" if entrez.nil?
+    entrez = Gene.setup entrez, format: "Entrez Gene ID", namespace: entity.namespace
     index = Rbbt.share.databases.entrez.tax_ids.index target: "Entrez Tax ID", persist: true
-    tax = index[Organism.scietific_name(entity.namespace)]
-    pmids = Entrez.entrez2pubmed(tax)[entity.entrez]
+    tax = index[Organism.scietific_name(entrez.namespace)]
+    pmids = Entrez.entrez2pubmed(tax)[entrez]
     PubMed.get_article(pmids)
     pmids.collect{|id| ["PMID", id, :abstract] * ":" }
   end
 
   entity_task :uniprot_pmids => :array do
-    json = JSON.parse(Open.read("https://rest.uniprot.org/uniprotkb/#{entity.to("UniProt/SwissProt Accession")}?format=json"))
+    uniprot = begin
+                entity.to("UniProt/SwissProt Accession")
+              rescue => e
+                begin
+                  entity.format = nil
+                  entity.to("UniProt/SwissProt Accession")
+                rescue
+                  raise e
+                end
+              end
+    json = JSON.parse(Open.read("https://rest.uniprot.org/uniprotkb/#{uniprot}?format=json"))
     IndiferentHash.setup(json)
     pmids = json.dig("references").
       inject([]){|acc,e| 
@@ -101,7 +132,8 @@ module Gene
   property_task :literature_summary => :text do |uniprot_abstracts|
     Step.wait_for_jobs dependencies
     text = dependencies[1..-1].collect(&:load) * "\n"
-    response = LLM.ask "Summarize this text:\n[[#{text}]]", endpoint: 'sambanova'
+    endpoint = config(:endpoint)
+    response = LLM.ask "Summarize this text:\n[[#{text}]]", endpoint: endpoint
     response.split("</think>").last.strip
   end
 
@@ -116,9 +148,12 @@ Also, translate all gene and protein mentions into HGNC format for human
     EOF
     text = step(:uniprot_summary).load
 
-    response = LLM.ask "#{prompt}:\n[[#{text}]]", endpoint: 'sambanova'
+    endpoint = config(:endpoint)
+    response = LLM.ask "#{prompt}:\n[[#{text}]]", endpoint: endpoint
     response.split("</think>").last.split("\n")
   end
+
+  export :interactions, :literature_summary, :rag
 end
 
 require "Gene/knowledge_base"
