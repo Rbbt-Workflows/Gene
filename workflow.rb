@@ -16,7 +16,7 @@ module Gene
 
   add_identifiers Organism.identifiers("NAMESPACE"), "Associated Gene Name"
 
-  annotation_input :format, :string, "Format in which the gene is specified", "Associated Gene Name" 
+  annotation_input :format, :string, "Format in which the input entity is specified", "Associated Gene Name" 
   annotation_input :namespace, :string, "Namespace of the entity", "Hsa/feb2014"
 
   helper :layout do
@@ -33,7 +33,7 @@ module Gene
   desc "Translate gene identifiers"
   input :target_format, :string, "Format to which translate the gene identifier", "UniProt/SwissProt Accession"
   entity_task translate: :string do |target_format|
-    begin
+    translated = begin
       entity.to target_format
     rescue => e
       begin
@@ -43,6 +43,10 @@ module Gene
         raise e
       end
     end
+
+    raise ParameterException, "Could not translate the '#{entity.format}' #{entity} to '#{target_format}' format" if translated.nil?
+
+    translated
   end
 
   entity_task_alias :uniprot, Gene, :translate, target_format: "UniProt/SwissProt Accession"
@@ -65,11 +69,16 @@ module Gene
                  raise e
                end
              end
-    raise "Could not find entrez code for #{entity}" if entrez.nil?
+
+    raise ParameterException, "Could not translate the '#{entity.format}' #{entity} to 'Entrez Gene ID' format" if entrez.nil?
+
     entrez = Gene.setup entrez, format: "Entrez Gene ID", namespace: entity.namespace
     index = Rbbt.share.databases.entrez.tax_ids.index target: "Entrez Tax ID", persist: true
     tax = index[Organism.scietific_name(entrez.namespace)]
+
     pmids = Entrez.entrez2pubmed(tax)[entrez]
+    next [] if pmids.nil?
+
     PubMed.get_article(pmids)
     pmids.collect{|id| ["PMID", id, :abstract] * ":" }
   end
@@ -85,6 +94,8 @@ module Gene
                   raise e
                 end
               end
+    raise ParameterException, "Could not translate the '#{entity.format}' #{entity} to 'UniProt/SwissProt Accession' format" if uniprot.nil?
+
     json = JSON.parse(Open.read("https://rest.uniprot.org/uniprotkb/#{uniprot}?format=json"))
     IndiferentHash.setup(json)
     pmids = json.dig("references").
@@ -123,17 +134,19 @@ module Gene
   list_task_alias :rag, DocID, :rag, list: :pmids
 
   dep :rag, compute: :produce
-  dep DocID, :text do |jobname,options,dependencies|
+  dep DocID, :text, entity: :placeholder do |jobname,options,dependencies|
     dependencies.flatten.first.run.collect do |docid|
+      options[:entity] = docid
       {jobname: docid, inputs:options }
     end
   end
   extension :md
   property_task :literature_summary => :text do |uniprot_abstracts|
+    prompt = self.recursive_inputs[:prompt]
     Step.wait_for_jobs dependencies
-    text = dependencies[1..-1].collect(&:load) * "\n"
+    text = dependencies[1..-1].collect(&:load) * "\n\n"
     endpoint = config(:endpoint)
-    response = LLM.ask "Summarize this text:\n[[#{text}]]", endpoint: endpoint
+    response = LLM.ask "Summarize the following texts as it pertains to '#{prompt}':\n[[#{text}]]", endpoint: endpoint, tool_choice: "none"
     response.split("</think>").last.strip
   end
 
@@ -153,7 +166,7 @@ Also, translate all gene and protein mentions into HGNC format for human
     response.split("</think>").last.split("\n")
   end
 
-  export :interactions, :literature_summary, :rag
+  export :literature_summary
 end
 
 require "Gene/knowledge_base"

@@ -4,7 +4,7 @@ This workflow provides gene-centric utilities for translating gene identifiers, 
 
 The workflow is implemented as an EntityWorkflow over a Gene entity. A gene is provided as an identifier plus two common annotation inputs:
 
-- format: how the identifier is expressed (default: "Associated Gene Name" which is how HGNC symbols are called)
+- format: how the identifier is expressed (default: "Associated Gene Name" which is how HGNC symbols are called). Generally you won't need to change it
 - namespace: organism/identifier namespace (default: "Hsa/feb2014")
 
 Most tasks can be used either from Ruby (as a library) or via the Scout/Rbbt REST layer, depending on how you deploy workflows.
@@ -27,7 +27,7 @@ Notes and dependencies:
 - entrez_pmids uses Rbbt Entrez sources.
 - uniprot_pmids calls the UniProt REST API and extracts PubMed cross-references.
 - PubMed.get_article is called to prefetch/cache article metadata/abstracts for the returned PMIDs.
-- literature_summary and interactions use an LLM endpoint named sambanova (via scout-ai). You must configure that endpoint in your Scout deployment.
+- literature_summary and interactions use an LLM endpoint named embed (via scout-ai). You must configure that endpoint in your Scout deployment.
 - The rag task is an alias to the DocID workflow. This workflow declares Workflow.require_workflow "DocID"; you must have that workflow available.
 
 # Tasks
@@ -174,7 +174,7 @@ Implementation notes:
 - The workflow dynamically creates dependencies on DocID text jobs for each document id produced by rag.
 - It concatenates the loaded document texts (one per line) and sends them to LLM.ask with a prompt of the form Summarize this text followed by the combined text.
 - The response is post-processed by splitting on </think> and taking the final segment.
-- The LLM endpoint used is sambanova; this must exist in your Scout LLM configuration.
+- The LLM endpoint used is embed; this must exist in your Scout LLM configuration.
 
 ## interactions
 Extract protein-protein interactions mentioned in the summarized literature
@@ -189,4 +189,4 @@ Implementation notes:
 
 - The prompt requests that all gene and protein mentions be translated into HGNC format for human.
 - The task depends on literature_summary, but the current code loads text using step(:uniprot_summary). If uniprot_summary is not defined in your deployment, this task will fail until the reference is updated to use the intended upstream task output.
-- The LLM endpoint used is sambanova; the output is split on </think> and then split into lines.
+- The LLM endpoint used is embed; the output is split on </think> and then split into lines.
