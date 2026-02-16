@@ -16,7 +16,7 @@ module Gene
 
   add_identifiers Organism.identifiers("NAMESPACE"), "Associated Gene Name"
 
-  annotation_input :format, :string, "Format in which the input entity is specified", "Associated Gene Name" 
+  annotation_input :format, :string, "Format in which the input entity is specified", "Associated Gene Name"
   annotation_input :namespace, :string, "Namespace of the entity", "Hsa/feb2014"
 
   helper :layout do
@@ -146,7 +146,7 @@ module Gene
     Step.wait_for_jobs dependencies
     text = dependencies[1..-1].collect(&:load) * "\n\n"
     endpoint = config(:endpoint)
-    response = LLM.ask "Summarize the following texts as it pertains to '#{prompt}':\n[[#{text}]]", endpoint: endpoint, tool_choice: "none"
+    response = LLM.ask "Summarize the following texts as it pertains to '#{prompt}':\n\n[[#{text}]]", endpoint: endpoint
     response.split("</think>").last.strip
   end
 
