@@ -1,6 +1,6 @@
 ---
 CollecTRI:
-- "~/.rbbt/var/jobs/ExTRI2/CollecTRI2/Default.tsv"
+- "~/.rbbt/var/jobs/ExTRI2/CollecTRI2_signs/Default.tsv"
 - source: "Transcription Factor=~Associated Gene Name"
   target: "Target Gene=~Associated Gene Name"
   description: Transcription Factor (TF) and their Target Genes (TG)
